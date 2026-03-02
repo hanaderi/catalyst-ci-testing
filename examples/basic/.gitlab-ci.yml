@@ -1,0 +1,24 @@
+stages:
+  - build
+  - test
+
+build:
+  stage: build
+  image: alpine:latest
+  script:
+    - echo "Building the project..."
+    - echo "Build complete"
+    - mkdir -p dist
+    - echo "artifact content" > dist/output.txt
+  artifacts:
+    paths:
+      - dist/
+
+test:
+  stage: test
+  image: alpine:latest
+  script:
+    - echo "Running tests..."
+    - echo "All tests passed"
+  needs:
+    - build

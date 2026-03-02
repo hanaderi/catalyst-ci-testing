@@ -1,0 +1,7 @@
+.deploy_template:
+  stage: deploy
+  script:
+    - echo "Deploying to $DEPLOY_ENV..."
+    - echo "Deployment complete"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"

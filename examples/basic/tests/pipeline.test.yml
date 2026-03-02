@@ -1,0 +1,18 @@
+---
+description: "Pipeline should succeed with all jobs"
+project: ../
+asserts:
+  - type: success
+  - type: job_success
+    job: build
+  - type: job_success
+    job: test
+  - type: run_jobs
+    jobs: [build, test]
+---
+description: "Build job should output 'Build complete'"
+project: ../
+asserts:
+  - type: output_contains
+    job: build
+    expected: "Build complete"

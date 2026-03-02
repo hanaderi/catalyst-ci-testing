@@ -1,0 +1,17 @@
+stages:
+  - build
+  - deploy
+
+include:
+  - local: templates/deploy.yml
+
+build:
+  stage: build
+  image: alpine:latest
+  script:
+    - echo "Building..."
+    - echo "Build done"
+
+deploy:
+  extends: .deploy_template
+  image: alpine:latest

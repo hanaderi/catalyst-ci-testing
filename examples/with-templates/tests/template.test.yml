@@ -1,0 +1,11 @@
+---
+description: "Pipeline with included template should succeed"
+project: ../
+variables:
+  CI_COMMIT_BRANCH: main
+  DEPLOY_ENV: staging
+asserts:
+  - type: success
+  - type: output_contains
+    job: deploy
+    expected: "Deploying to staging"
