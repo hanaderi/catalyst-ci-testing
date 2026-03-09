@@ -214,6 +214,25 @@ class TestDryRunCommand:
         assert "Build complete!" in result.output
         assert "Running tests..." in result.output
 
+    def test_dry_run_raw_output(self, tmp_path):
+        """Verify --raw prints the full gitlab-ci-local output."""
+        (tmp_path / ".gitlab-ci.yml").write_text("test:\n  script: echo hi\n")
+        mock_result = self._make_pipeline_result()
+        mock_result.raw_stdout = "full gitlab-ci-local stdout here"
+        mock_result.raw_stderr = "some stderr output"
+
+        with patch(
+            "catalyst_ci_test.runner.run_pipeline", return_value=mock_result
+        ):
+            runner = CliRunner()
+            result = runner.invoke(
+                main, ["dry-run", str(tmp_path), "--raw"]
+            )
+
+        assert result.exit_code == 0
+        assert "full gitlab-ci-local stdout here" in result.output
+        assert "some stderr output" in result.output
+
     def test_dry_run_pipeline_exception(self, tmp_path):
         """Verify clean error when pipeline execution fails."""
         (tmp_path / ".gitlab-ci.yml").write_text("test:\n  script: echo hi\n")

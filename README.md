@@ -112,6 +112,7 @@ Run a pipeline directly and display results **without** executing any test asser
 | `--timeout N` | | Pipeline timeout in seconds (default: 600) |
 | `--force-shell-executor` | | Run jobs in local shell instead of Docker |
 | `--show-output` | `-o` | Print full stdout for each job |
+| `--raw` | `-r` | Print the full raw gitlab-ci-local output |
 
 ```bash
 # Run a pipeline and see job statuses
@@ -119,6 +120,9 @@ catalyst-ci-test dry-run path/to/project/
 
 # Run with full job output
 catalyst-ci-test dry-run path/to/project/ -o
+
+# Print the full raw CI output (useful for debugging)
+catalyst-ci-test dry-run path/to/project/ -r
 
 # Run only the build job
 catalyst-ci-test dry-run path/to/project/ -j build

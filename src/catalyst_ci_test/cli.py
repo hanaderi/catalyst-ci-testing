@@ -96,6 +96,12 @@ def run(
     is_flag=True,
     help="Print full stdout for each job",
 )
+@click.option(
+    "--raw",
+    "-r",
+    is_flag=True,
+    help="Print the full raw gitlab-ci-local output",
+)
 def dry_run(
     path: str,
     timeout: int,
@@ -104,6 +110,7 @@ def dry_run(
     variables: tuple[str, ...],
     ci_file: str | None,
     show_output: bool,
+    raw: bool,
 ):
     """Run a pipeline without test assertions and display results.
 
@@ -138,16 +145,39 @@ def dry_run(
         console.print(f"[red]Pipeline execution failed: {e}[/red]")
         sys.exit(1)
 
-    _print_results(result, show_output=show_output)
+    _print_results(result, show_output=show_output, raw=raw)
     sys.exit(0 if result.success else 1)
 
 
-def _print_results(result, *, show_output: bool = False) -> None:
+def _print_results(
+    result, *, show_output: bool = False, raw: bool = False
+) -> None:
     """Print a structured summary of pipeline results using Rich."""
     from rich.panel import Panel
     from rich.table import Table
 
     from .models import JobStatus
+
+    # Raw mode: dump the full gitlab-ci-local output and return
+    if raw:
+        if result.raw_stdout:
+            console.print(
+                Panel(
+                    result.raw_stdout.rstrip(),
+                    title="[bold]gitlab-ci-local stdout[/bold]",
+                    expand=True,
+                )
+            )
+        if result.raw_stderr:
+            console.print(
+                Panel(
+                    result.raw_stderr.rstrip(),
+                    title="[bold]gitlab-ci-local stderr[/bold]",
+                    border_style="red",
+                    expand=True,
+                )
+            )
+        return
 
     # Pipeline status header
     if result.success:
