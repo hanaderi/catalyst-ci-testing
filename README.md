@@ -13,6 +13,35 @@ Test your GitLab CI/CD pipelines and templates locally before pushing. Wraps [gi
 
 > **Note**: Docker must be running for pipeline execution. Use `--force-shell-executor` to run without Docker (jobs execute in a local shell instead).
 
+## Windows Support
+
+catalyst-ci-test works on Windows under Git Bash. The tool automatically sets
+`MSYS_NO_PATHCONV=1` in the subprocess environment to prevent MSYS path
+conversion issues that break `rsync` and `/bin/bash` inside gitlab-ci-local.
+
+### Windows Prerequisites
+
+| Dependency | Notes |
+|---|---|
+| [Git for Windows](https://git-scm.com/) | Provides Git Bash |
+| [Node.js](https://nodejs.org/) | Native Windows build |
+| [Docker Desktop](https://www.docker.com/) | Must be running |
+| [Python >= 3.10](https://www.python.org/) | Windows installer |
+
+### Recommended: Use WSL
+
+For the best experience on Windows, run catalyst-ci-test inside
+[WSL (Windows Subsystem for Linux)](https://learn.microsoft.com/en-us/windows/wsl/).
+WSL provides a native Linux environment, avoiding MSYS path conversion issues
+entirely.
+
+```bash
+# Inside WSL (Ubuntu)
+sudo apt update && sudo apt install -y python3 python3-pip nodejs npm docker.io
+pip install catalyst-ci-test
+npm install -g gitlab-ci-local
+```
+
 ## Installation
 
 ```bash
@@ -334,3 +363,13 @@ Increase the timeout with `--timeout 1200` or set `timeout: 1200` in your YAML t
 
 **Include resolution failures**
 All GitLab `include:` types (local, remote, template, project, component) are handled by `gitlab-ci-local`. Check that remote URLs are accessible and local paths are correct relative to the project directory.
+
+**Windows: rsync path errors**
+catalyst-ci-test sets `MSYS_NO_PATHCONV=1` automatically. If you still see rsync
+errors, ensure you are running from Git Bash (not PowerShell or CMD) and that
+your Python is the native Windows build, not a Cygwin or MSYS Python. As a
+fallback, try running inside WSL instead.
+
+**Windows: `/bin/bash` not found**
+This usually indicates `MSYS_NO_PATHCONV` is not taking effect. Ensure you have
+the latest version of catalyst-ci-test. As a workaround, use WSL instead.

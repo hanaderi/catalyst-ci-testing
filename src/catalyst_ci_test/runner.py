@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import glob as glob_mod
 import logging
+import os
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -40,6 +42,23 @@ def check_gitlab_ci_local() -> str:
             "Install it with: npm install -g gitlab-ci-local"
         )
     return path
+
+
+def _build_env() -> dict[str, str] | None:
+    """Build environment dict for subprocess calls.
+
+    On Windows (including Git Bash / MSYS2), sets ``MSYS_NO_PATHCONV=1``
+    to prevent automatic POSIX-to-Windows path conversion, which breaks
+    rsync and ``/bin/bash`` references inside gitlab-ci-local.
+
+    Returns ``None`` on non-Windows platforms so subprocess inherits
+    the parent environment unchanged.
+    """
+    if sys.platform == "win32":
+        env = os.environ.copy()
+        env["MSYS_NO_PATHCONV"] = "1"
+        return env
+    return None
 
 
 def _build_command(
@@ -118,6 +137,13 @@ def run_pipeline(
     if options.templates:
         _copy_templates(options.templates, project_path)
 
+    env = _build_env()
+    if sys.platform == "win32":
+        logger.info(
+            "Running on Windows. For the best experience, consider using WSL. "
+            "See README for details."
+        )
+
     # Phase 1: Get job metadata via --list-json
     list_cmd = _build_command(options, list_json=True)
     try:
@@ -127,6 +153,7 @@ def run_pipeline(
             text=True,
             timeout=30,
             cwd=str(project_path),
+            env=env,
         )
         if list_result.returncode != 0:
             stderr = list_result.stderr.strip()
@@ -154,6 +181,7 @@ def run_pipeline(
             text=True,
             timeout=options.timeout,
             cwd=str(project_path),
+            env=env,
         )
     except subprocess.TimeoutExpired as e:
         raise PipelineExecutionError(

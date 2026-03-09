@@ -1,5 +1,6 @@
 """Tests for the pipeline runner module."""
 
+import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -12,6 +13,7 @@ from catalyst_ci_test.exceptions import (
 from catalyst_ci_test.runner import (
     RunOptions,
     _build_command,
+    _build_env,
     check_gitlab_ci_local,
     run_pipeline,
 )
@@ -84,6 +86,52 @@ class TestCheckGitlabCiLocal:
             assert path == "/usr/bin/gitlab-ci-local"
 
 
+class TestBuildEnv:
+    def test_returns_none_on_linux(self):
+        """On Linux, _build_env should return None (inherit parent env)."""
+        with patch("catalyst_ci_test.runner.sys") as mock_sys:
+            mock_sys.platform = "linux"
+            assert _build_env() is None
+
+    def test_returns_none_on_darwin(self):
+        """On macOS, _build_env should return None."""
+        with patch("catalyst_ci_test.runner.sys") as mock_sys:
+            mock_sys.platform = "darwin"
+            assert _build_env() is None
+
+    def test_sets_msys_no_pathconv_on_windows(self):
+        """On Windows, _build_env should set MSYS_NO_PATHCONV=1."""
+        with patch("catalyst_ci_test.runner.sys") as mock_sys:
+            mock_sys.platform = "win32"
+            with patch.dict("os.environ", {"PATH": "/usr/bin"}, clear=True):
+                env = _build_env()
+                assert env is not None
+                assert env["MSYS_NO_PATHCONV"] == "1"
+
+    def test_preserves_existing_env_on_windows(self):
+        """On Windows, _build_env should preserve all existing env vars."""
+        with patch("catalyst_ci_test.runner.sys") as mock_sys:
+            mock_sys.platform = "win32"
+            with patch.dict(
+                "os.environ",
+                {"MY_VAR": "hello", "PATH": "/usr/bin"},
+                clear=True,
+            ):
+                env = _build_env()
+                assert env["MY_VAR"] == "hello"
+                assert env["PATH"] == "/usr/bin"
+                assert env["MSYS_NO_PATHCONV"] == "1"
+
+    def test_does_not_mutate_os_environ(self):
+        """_build_env should copy the env, not mutate os.environ."""
+        with patch("catalyst_ci_test.runner.sys") as mock_sys:
+            mock_sys.platform = "win32"
+            had_key = "MSYS_NO_PATHCONV" in os.environ
+            _build_env()
+            if not had_key:
+                assert "MSYS_NO_PATHCONV" not in os.environ
+
+
 class TestRunPipeline:
     def test_no_ci_file_raises(self, tmp_path):
         with patch(
@@ -146,3 +194,69 @@ class TestRunPipeline:
             ):
                 with pytest.raises(PipelineExecutionError, match="list-json failed"):
                     run_pipeline(tmp_path)
+
+    def test_subprocess_receives_env_on_windows(self, tmp_path):
+        """On Windows, subprocess should receive env with MSYS_NO_PATHCONV."""
+        (tmp_path / ".gitlab-ci.yml").write_text("test:\n  script: echo hi\n")
+
+        mock_list_result = MagicMock()
+        mock_list_result.returncode = 0
+        mock_list_result.stdout = (
+            '[{"name": "test", "stage": "test", "when": "on_success"}]'
+        )
+        mock_list_result.stderr = ""
+
+        mock_run_result = MagicMock()
+        mock_run_result.returncode = 0
+        mock_run_result.stdout = ""
+        mock_run_result.stderr = "PASS  test\n"
+
+        with patch(
+            "catalyst_ci_test.runner.shutil.which",
+            return_value="/usr/bin/gitlab-ci-local",
+        ):
+            with patch(
+                "catalyst_ci_test.runner.subprocess.run",
+                side_effect=[mock_list_result, mock_run_result],
+            ) as mock_run:
+                with patch("catalyst_ci_test.runner.sys") as mock_sys:
+                    mock_sys.platform = "win32"
+                    run_pipeline(tmp_path)
+
+                    # Both subprocess calls should have env with MSYS_NO_PATHCONV
+                    for call in mock_run.call_args_list:
+                        env = call.kwargs.get("env")
+                        assert env is not None
+                        assert env["MSYS_NO_PATHCONV"] == "1"
+
+    def test_subprocess_receives_no_env_on_linux(self, tmp_path):
+        """On Linux, subprocess should receive env=None (inherit parent)."""
+        (tmp_path / ".gitlab-ci.yml").write_text("test:\n  script: echo hi\n")
+
+        mock_list_result = MagicMock()
+        mock_list_result.returncode = 0
+        mock_list_result.stdout = (
+            '[{"name": "test", "stage": "test", "when": "on_success"}]'
+        )
+        mock_list_result.stderr = ""
+
+        mock_run_result = MagicMock()
+        mock_run_result.returncode = 0
+        mock_run_result.stdout = ""
+        mock_run_result.stderr = "PASS  test\n"
+
+        with patch(
+            "catalyst_ci_test.runner.shutil.which",
+            return_value="/usr/bin/gitlab-ci-local",
+        ):
+            with patch(
+                "catalyst_ci_test.runner.subprocess.run",
+                side_effect=[mock_list_result, mock_run_result],
+            ) as mock_run:
+                with patch("catalyst_ci_test.runner.sys") as mock_sys:
+                    mock_sys.platform = "linux"
+                    run_pipeline(tmp_path)
+
+                    # Both subprocess calls should have env=None
+                    for call in mock_run.call_args_list:
+                        assert call.kwargs.get("env") is None
