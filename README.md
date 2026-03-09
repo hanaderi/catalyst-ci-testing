@@ -100,6 +100,36 @@ catalyst-ci-test run tests/ -j build
 catalyst-ci-test run tests/ --force-shell-executor -v
 ```
 
+### `catalyst-ci-test dry-run [PATH]`
+
+Run a pipeline directly and display results **without** executing any test assertions. Useful for debugging your `.gitlab-ci.yml` before writing tests.
+
+| Option | Short | Description |
+|---|---|---|
+| `--job NAME` | `-j` | Run only specific job(s). Repeatable: `-j build -j test` |
+| `--variable KEY=VALUE` | `-e` | Set CI variable. Repeatable: `-e FOO=bar -e BAZ=qux` |
+| `--file PATH` | `-f` | Custom CI config file (default: `.gitlab-ci.yml`) |
+| `--timeout N` | | Pipeline timeout in seconds (default: 600) |
+| `--force-shell-executor` | | Run jobs in local shell instead of Docker |
+| `--show-output` | `-o` | Print full stdout for each job |
+
+```bash
+# Run a pipeline and see job statuses
+catalyst-ci-test dry-run path/to/project/
+
+# Run with full job output
+catalyst-ci-test dry-run path/to/project/ -o
+
+# Run only the build job
+catalyst-ci-test dry-run path/to/project/ -j build
+
+# Pass CI variables
+catalyst-ci-test dry-run path/to/project/ -e CI_COMMIT_BRANCH=main -e ENV=prod
+
+# Use without Docker
+catalyst-ci-test dry-run path/to/project/ --force-shell-executor -o
+```
+
 ### `catalyst-ci-test lint [PATH]`
 
 Validate test file schemas without executing pipelines.
