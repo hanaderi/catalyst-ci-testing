@@ -70,6 +70,15 @@ class TestBuildCommand:
         assert "--mount" in cmd
         assert "/tmp:/data" in cmd
 
+    def test_uses_resolved_executable_path(self):
+        """On Windows, the full resolved path (e.g. .cmd) should be used."""
+        cmd = _build_command(
+            RunOptions(),
+            executable="C:\\Users\\me\\AppData\\Roaming\\npm\\gitlab-ci-local.cmd",
+        )
+        assert cmd[0] == "C:\\Users\\me\\AppData\\Roaming\\npm\\gitlab-ci-local.cmd"
+        assert cmd[1:4] == ["--cwd", ".", "--no-color"]
+
 
 class TestCheckGitlabCiLocal:
     def test_not_installed(self):
@@ -194,6 +203,38 @@ class TestRunPipeline:
             ):
                 with pytest.raises(PipelineExecutionError, match="list-json failed"):
                     run_pipeline(tmp_path)
+
+    def test_subprocess_uses_resolved_executable(self, tmp_path):
+        """The resolved path from shutil.which should be used in the command."""
+        (tmp_path / ".gitlab-ci.yml").write_text("test:\n  script: echo hi\n")
+
+        mock_list_result = MagicMock()
+        mock_list_result.returncode = 0
+        mock_list_result.stdout = (
+            '[{"name": "test", "stage": "test", "when": "on_success"}]'
+        )
+        mock_list_result.stderr = ""
+
+        mock_run_result = MagicMock()
+        mock_run_result.returncode = 0
+        mock_run_result.stdout = ""
+        mock_run_result.stderr = "PASS  test\n"
+
+        resolved = "C:\\Users\\me\\AppData\\Roaming\\npm\\gitlab-ci-local.cmd"
+        with patch(
+            "catalyst_ci_test.runner.shutil.which",
+            return_value=resolved,
+        ):
+            with patch(
+                "catalyst_ci_test.runner.subprocess.run",
+                side_effect=[mock_list_result, mock_run_result],
+            ) as mock_run:
+                run_pipeline(tmp_path)
+
+                # Both subprocess calls should use the resolved executable
+                for call in mock_run.call_args_list:
+                    cmd = call.args[0]
+                    assert cmd[0] == resolved
 
     def test_subprocess_receives_env_on_windows(self, tmp_path):
         """On Windows, subprocess should receive env with MSYS_NO_PATHCONV."""

@@ -65,13 +65,18 @@ def _build_command(
     options: RunOptions,
     *,
     list_json: bool = False,
+    executable: str = "gitlab-ci-local",
 ) -> list[str]:
     """Build the gitlab-ci-local command.
 
     Uses ``--cwd .`` because subprocess is executed with ``cwd=project_path``,
     so gitlab-ci-local always runs from within the project directory.
+
+    On Windows, ``executable`` should be the full resolved path from
+    ``shutil.which()`` (e.g. ``gitlab-ci-local.cmd``) because
+    ``subprocess.run()`` with a list cannot locate ``.cmd`` wrapper scripts.
     """
-    cmd = ["gitlab-ci-local", "--cwd", ".", "--no-color"]
+    cmd = [executable, "--cwd", ".", "--no-color"]
 
     if list_json:
         cmd.append("--list-json")
@@ -125,7 +130,7 @@ def run_pipeline(
     if options is None:
         options = RunOptions()
 
-    check_gitlab_ci_local()
+    gcl_path = check_gitlab_ci_local()
     project_path = Path(project_path).resolve()
 
     ci_file = project_path / ".gitlab-ci.yml"
@@ -145,7 +150,7 @@ def run_pipeline(
         )
 
     # Phase 1: Get job metadata via --list-json
-    list_cmd = _build_command(options, list_json=True)
+    list_cmd = _build_command(options, list_json=True, executable=gcl_path)
     try:
         list_result = subprocess.run(
             list_cmd,
@@ -173,7 +178,7 @@ def run_pipeline(
         ) from e
 
     # Phase 2: Run the pipeline
-    run_cmd = _build_command(options)
+    run_cmd = _build_command(options, executable=gcl_path)
     try:
         result = subprocess.run(
             run_cmd,
