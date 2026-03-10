@@ -404,6 +404,34 @@ The tool uses a two-phase execution model:
 - **Phase 1**: `gitlab-ci-local --list-json` to discover job metadata
 - **Phase 2**: `gitlab-ci-local` to run the pipeline, then read per-job logs
 
+## Offline / Air-Gapped Networks
+
+`gitlab-ci-local` pulls `firecow/gitlab-ci-local-util:latest` from Docker Hub at
+runtime. In isolated networks without internet, pre-load this image:
+
+```bash
+# On a machine WITH internet — save the image
+./scripts/setup-offline.sh save
+
+# Transfer the .offline-images/ folder to your isolated machine, then:
+./scripts/setup-offline.sh load
+```
+
+Or manually:
+
+```bash
+# Machine with internet:
+docker pull firecow/gitlab-ci-local-util:latest
+docker save firecow/gitlab-ci-local-util:latest -o util.tar
+
+# Isolated machine:
+docker load -i util.tar
+```
+
+You also need to pre-load any Docker images referenced in your `.gitlab-ci.yml`
+`image:` fields (e.g. `python:3.12`, `node:22-alpine`). Alternatively, use
+`--force-shell-executor` to skip Docker entirely.
+
 ## Troubleshooting
 
 **"gitlab-ci-local is not installed"**

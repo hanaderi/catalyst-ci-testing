@@ -39,4 +39,7 @@ Thumbs.db
 # gitlab-ci-local state
 .gitlab-ci-local/
 
+# Offline Docker image tarballs
+.offline-images/
+
 .claude/
