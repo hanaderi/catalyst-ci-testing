@@ -28,12 +28,34 @@ conversion issues that break `rsync` and `/bin/bash` inside gitlab-ci-local.
 | [Docker Desktop](https://www.docker.com/) | Must be running |
 | [Python >= 3.10](https://www.python.org/) | Windows installer |
 
-### Recommended: Use WSL
+### Option 1: Docker (Recommended)
 
-For the best experience on Windows, run catalyst-ci-test inside
+Run catalyst-ci-test in a container — no local Node.js, rsync, or bash needed.
+
+```bash
+# Build the image
+docker build -t catalyst-ci-test .
+
+# Run interactively — mount your project and the Docker socket
+docker run -it --rm \
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  -v %cd%:/workspace \
+  catalyst-ci-test
+
+# Inside the container, all commands work:
+catalyst-ci-test dry-run . -o
+catalyst-ci-test run tests/
+```
+
+> **Note**: Mount the Docker socket (`-v /var/run/docker.sock:...`) so
+> gitlab-ci-local can start Docker containers for your CI jobs. On Windows
+> use `-v //var/run/docker.sock:/var/run/docker.sock` or run Docker Desktop
+> with the "Expose daemon" setting enabled.
+
+### Option 2: WSL
+
+Alternatively, run natively inside
 [WSL (Windows Subsystem for Linux)](https://learn.microsoft.com/en-us/windows/wsl/).
-WSL provides a native Linux environment, avoiding MSYS path conversion issues
-entirely.
 
 ```bash
 # Inside WSL (Ubuntu)
@@ -398,11 +420,24 @@ Increase the timeout with `--timeout 1200` or set `timeout: 1200` in your YAML t
 **Include resolution failures**
 All GitLab `include:` types (local, remote, template, project, component) are handled by `gitlab-ci-local`. Check that remote URLs are accessible and local paths are correct relative to the project directory.
 
-**Windows: rsync path errors**
-catalyst-ci-test sets `MSYS_NO_PATHCONV=1` automatically. If you still see rsync
+**Windows: rsync `/dev/fd/` or `exclude file` errors**
+gitlab-ci-local uses bash process substitution (`<(...)`) in its rsync command
+to exclude untracked files. This creates `/dev/fd/` file descriptors which do
+not exist on native Windows. This is a fundamental gitlab-ci-local limitation,
+not a catalyst-ci-test bug. Two solutions:
+
+1. **Use WSL** (recommended) — run everything inside Windows Subsystem for
+   Linux where bash, rsync, and `/dev/fd/` work natively.
+2. **Use `--force-shell-executor`** — skips Docker and the rsync step entirely.
+   Jobs run in a local shell instead:
+   ```bash
+   catalyst-ci-test dry-run path/to/project/ --force-shell-executor -o
+   ```
+
+**Windows: rsync path conversion errors**
+catalyst-ci-test sets `MSYS_NO_PATHCONV=1` automatically. If you still see path
 errors, ensure you are running from Git Bash (not PowerShell or CMD) and that
-your Python is the native Windows build, not a Cygwin or MSYS Python. As a
-fallback, try running inside WSL instead.
+your Python is the native Windows build, not a Cygwin or MSYS Python.
 
 **Windows: `/bin/bash` not found**
 This usually indicates `MSYS_NO_PATHCONV` is not taking effect. Ensure you have

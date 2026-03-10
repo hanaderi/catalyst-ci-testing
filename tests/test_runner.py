@@ -301,3 +301,73 @@ class TestRunPipeline:
                     # Both subprocess calls should have env=None
                     for call in mock_run.call_args_list:
                         assert call.kwargs.get("env") is None
+
+    def test_windows_rsync_devfd_error_gives_clear_message(self, tmp_path):
+        """On Windows, rsync /dev/fd/ failure should give an actionable error."""
+        (tmp_path / ".gitlab-ci.yml").write_text("test:\n  script: echo hi\n")
+
+        mock_list_result = MagicMock()
+        mock_list_result.returncode = 0
+        mock_list_result.stdout = (
+            '[{"name": "test", "stage": "test", "when": "on_success"}]'
+        )
+        mock_list_result.stderr = ""
+
+        mock_run_result = MagicMock()
+        mock_run_result.returncode = 1
+        mock_run_result.stdout = ""
+        mock_run_result.stderr = (
+            "Error: Command failed with exit code 11: "
+            "rsync -a --delete-excluded --exclude-from=<(git ls-files) "
+            "rsync: failed to open exclude file /dev/fd/63: "
+            "No such file or directory"
+        )
+
+        with patch(
+            "catalyst_ci_test.runner.shutil.which",
+            return_value="C:\\npm\\gitlab-ci-local.cmd",
+        ):
+            with patch(
+                "catalyst_ci_test.runner.subprocess.run",
+                side_effect=[mock_list_result, mock_run_result],
+            ):
+                with patch("catalyst_ci_test.runner.sys") as mock_sys:
+                    mock_sys.platform = "win32"
+                    with pytest.raises(
+                        PipelineExecutionError,
+                        match="process substitution",
+                    ):
+                        run_pipeline(tmp_path)
+
+    def test_linux_rsync_error_not_intercepted(self, tmp_path):
+        """On Linux, rsync errors should NOT trigger the Windows message."""
+        (tmp_path / ".gitlab-ci.yml").write_text("test:\n  script: echo hi\n")
+
+        mock_list_result = MagicMock()
+        mock_list_result.returncode = 0
+        mock_list_result.stdout = (
+            '[{"name": "test", "stage": "test", "when": "on_success"}]'
+        )
+        mock_list_result.stderr = ""
+
+        mock_run_result = MagicMock()
+        mock_run_result.returncode = 1
+        mock_run_result.stdout = ""
+        mock_run_result.stderr = (
+            "rsync: failed to open exclude file /dev/fd/63"
+        )
+
+        with patch(
+            "catalyst_ci_test.runner.shutil.which",
+            return_value="/usr/bin/gitlab-ci-local",
+        ):
+            with patch(
+                "catalyst_ci_test.runner.subprocess.run",
+                side_effect=[mock_list_result, mock_run_result],
+            ):
+                with patch("catalyst_ci_test.runner.sys") as mock_sys:
+                    mock_sys.platform = "linux"
+                    # Should NOT raise the Windows-specific error;
+                    # pipeline proceeds to parse_pipeline_output normally
+                    result = run_pipeline(tmp_path)
+                    assert not result.success

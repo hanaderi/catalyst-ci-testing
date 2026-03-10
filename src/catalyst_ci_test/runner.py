@@ -193,6 +193,23 @@ def run_pipeline(
             f"Pipeline timed out after {options.timeout}s"
         ) from e
 
+    # Detect Windows rsync/process-substitution failure
+    if (
+        result.returncode != 0
+        and sys.platform == "win32"
+        and "rsync" in result.stderr
+        and ("/dev/fd/" in result.stderr or "exclude" in result.stderr)
+    ):
+        raise PipelineExecutionError(
+            "gitlab-ci-local failed because rsync does not support bash "
+            "process substitution (<(...)) on native Windows.\n\n"
+            "Solutions (pick one):\n"
+            "  1. Use WSL:  run catalyst-ci-test inside Windows Subsystem for Linux\n"
+            "  2. Use shell executor:  add --force-shell-executor to skip Docker "
+            "(avoids the rsync step)\n\n"
+            "See README > Windows Support for setup instructions."
+        )
+
     # Phase 3: Parse results
     return parse_pipeline_output(
         raw_stdout=result.stdout,
