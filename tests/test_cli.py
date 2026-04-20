@@ -18,6 +18,13 @@ class TestRunCommandOptions:
         assert "--job" in result.output
         assert "-j" in result.output
 
+    def test_run_help_shows_file_flag(self):
+        runner = CliRunner()
+        result = runner.invoke(main, ["run", "--help"])
+        assert result.exit_code == 0
+        assert "--file" in result.output
+        assert "-f" in result.output
+
     def test_job_flag_sets_env_var(self, tmp_path):
         """Verify --job sets CATALYST_CI_TEST_JOBS env var."""
         captured_env = {}
@@ -39,6 +46,34 @@ class TestRunCommandOptions:
                 )
 
         assert captured_env.get("jobs") == "build,test"
+
+    def test_file_flag_sets_env_var(self, tmp_path):
+        """Verify --file sets CATALYST_CI_TEST_FILE env var."""
+        captured_env = {}
+
+        def mock_pytest_main(args):
+            captured_env["file"] = os.environ.get("CATALYST_CI_TEST_FILE", "")
+            return 0
+
+        (tmp_path / "dummy.test.yml").write_text(
+            'description: "test"\nasserts:\n  - type: success\n'
+        )
+
+        # Clear any leftover env var from a previous test
+        os.environ.pop("CATALYST_CI_TEST_FILE", None)
+
+        runner = CliRunner()
+        with patch("catalyst_ci_test.cli.sys.exit"):
+            with patch("pytest.main", side_effect=mock_pytest_main):
+                runner.invoke(
+                    main,
+                    ["run", str(tmp_path), "-f", "ci/custom-pipeline.yml"],
+                )
+
+        assert captured_env.get("file") == "ci/custom-pipeline.yml"
+
+        # Cleanup
+        os.environ.pop("CATALYST_CI_TEST_FILE", None)
 
 
 class TestLintCommand:

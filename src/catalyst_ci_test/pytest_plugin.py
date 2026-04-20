@@ -55,6 +55,16 @@ def _get_cli_jobs() -> list[str] | None:
     return [j.strip() for j in env_val.split(",") if j.strip()]
 
 
+def _get_cli_file() -> str | None:
+    """Read custom CI file path from CATALYST_CI_TEST_FILE environment variable.
+
+    This is set by the ``catalyst-ci-test run --file`` CLI flag.
+    Returns None if not set or empty.
+    """
+    env_val = os.environ.get("CATALYST_CI_TEST_FILE", "").strip()
+    return env_val or None
+
+
 # ---- Fixtures ----
 
 
@@ -80,10 +90,13 @@ def pipeline_runner():
         templates: list[str] | None = None,
         force_shell_executor: bool = False,
         timeout: int = 600,
+        file: str | None = None,
         **kwargs: Any,
     ) -> PipelineResult:
         # CLI --job flag acts as default; explicit jobs= takes precedence
         effective_jobs = jobs if jobs is not None else _get_cli_jobs()
+        # CLI --file flag acts as default; explicit file= takes precedence
+        effective_file = file if file is not None else _get_cli_file()
 
         options = RunOptions(
             variables=variables or {},
@@ -91,6 +104,7 @@ def pipeline_runner():
             templates=templates,
             force_shell_executor=force_shell_executor,
             timeout=timeout,
+            file=effective_file,
         )
         return run_pipeline(project_path, options)
 
@@ -135,6 +149,8 @@ class YamlTestItem(pytest.Item):
 
         # CLI --job flag acts as default; explicit jobs in YAML takes precedence
         effective_jobs = case.jobs if case.jobs is not None else _get_cli_jobs()
+        # CLI --file flag acts as default; explicit file in YAML takes precedence
+        effective_file = case.file if case.file is not None else _get_cli_file()
 
         options = RunOptions(
             variables=case.variables,
@@ -143,6 +159,7 @@ class YamlTestItem(pytest.Item):
             templates=case.templates,
             force_shell_executor=case.force_shell_executor,
             timeout=case.timeout,
+            file=effective_file,
         )
 
         result = run_pipeline(project_path, options)

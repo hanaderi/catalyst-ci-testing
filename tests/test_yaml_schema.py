@@ -31,6 +31,7 @@ class TestYamlTestCase:
             variables={"KEY": "value"},
             force_shell_executor=True,
             jobs=["build"],
+            file="ci/custom-pipeline.yml",
             timeout=120,
             asserts=[
                 {"type": "success"},
@@ -41,7 +42,15 @@ class TestYamlTestCase:
         assert case.variables == {"KEY": "value"}
         assert case.force_shell_executor is True
         assert case.jobs == ["build"]
+        assert case.file == "ci/custom-pipeline.yml"
         assert case.timeout == 120
+
+    def test_file_defaults_to_none(self):
+        case = YamlTestCase(
+            description="test",
+            asserts=[{"type": "success"}],
+        )
+        assert case.file is None
 
 
 class TestParseAsserts:

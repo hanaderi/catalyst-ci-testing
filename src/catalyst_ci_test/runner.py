@@ -80,6 +80,10 @@ def _build_command(
 
     if list_json:
         cmd.append("--list-json")
+        # --file must apply to --list-json too, otherwise gitlab-ci-local
+        # falls back to .gitlab-ci.yml when collecting job metadata.
+        if options.file:
+            cmd.extend(["--file", options.file])
         return cmd
 
     if options.force_shell_executor:

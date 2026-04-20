@@ -28,34 +28,11 @@ conversion issues that break `rsync` and `/bin/bash` inside gitlab-ci-local.
 | [Docker Desktop](https://www.docker.com/) | Must be running |
 | [Python >= 3.10](https://www.python.org/) | Windows installer |
 
-### Option 1: Docker (Recommended)
+### Recommended: Use WSL
 
-Run catalyst-ci-test in a container — no local Node.js, rsync, or bash needed.
-
-```bash
-# Build the image
-docker build -t catalyst-ci-test .
-
-# Run interactively — mount your project and the Docker socket
-docker run -it --rm \
-  -v /var/run/docker.sock:/var/run/docker.sock \
-  -v %cd%:/workspace \
-  catalyst-ci-test
-
-# Inside the container, all commands work:
-catalyst-ci-test dry-run . -o
-catalyst-ci-test run tests/
-```
-
-> **Note**: Mount the Docker socket (`-v /var/run/docker.sock:...`) so
-> gitlab-ci-local can start Docker containers for your CI jobs. On Windows
-> use `-v //var/run/docker.sock:/var/run/docker.sock` or run Docker Desktop
-> with the "Expose daemon" setting enabled.
-
-### Option 2: WSL
-
-Alternatively, run natively inside
-[WSL (Windows Subsystem for Linux)](https://learn.microsoft.com/en-us/windows/wsl/).
+For the best experience on Windows, run inside
+[WSL (Windows Subsystem for Linux)](https://learn.microsoft.com/en-us/windows/wsl/)
+where bash, rsync, and `/dev/fd/` work natively.
 
 ```bash
 # Inside WSL (Ubuntu)
@@ -403,34 +380,6 @@ src/catalyst_ci_test/
 The tool uses a two-phase execution model:
 - **Phase 1**: `gitlab-ci-local --list-json` to discover job metadata
 - **Phase 2**: `gitlab-ci-local` to run the pipeline, then read per-job logs
-
-## Offline / Air-Gapped Networks
-
-`gitlab-ci-local` pulls `firecow/gitlab-ci-local-util:latest` from Docker Hub at
-runtime. In isolated networks without internet, pre-load this image:
-
-```bash
-# On a machine WITH internet — save the image
-./scripts/setup-offline.sh save
-
-# Transfer the .offline-images/ folder to your isolated machine, then:
-./scripts/setup-offline.sh load
-```
-
-Or manually:
-
-```bash
-# Machine with internet:
-docker pull firecow/gitlab-ci-local-util:latest
-docker save firecow/gitlab-ci-local-util:latest -o util.tar
-
-# Isolated machine:
-docker load -i util.tar
-```
-
-You also need to pre-load any Docker images referenced in your `.gitlab-ci.yml`
-`image:` fields (e.g. `python:3.12`, `node:22-alpine`). Alternatively, use
-`--force-shell-executor` to skip Docker entirely.
 
 ## Troubleshooting
 

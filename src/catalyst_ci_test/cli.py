@@ -34,23 +34,37 @@ def main():
     multiple=True,
     help="Run only specific job(s). Can be repeated: -j build -j test",
 )
+@click.option(
+    "--file",
+    "-f",
+    "ci_file",
+    default=None,
+    type=click.Path(),
+    help="Custom CI config file path (default: .gitlab-ci.yml)",
+)
 def run(
     path: str,
     verbose: bool,
     timeout: int,
     force_shell_executor: bool,
     jobs: tuple[str, ...],
+    ci_file: str | None,
 ):
     """Run tests at PATH (file or directory).
 
     Discovers .test.yml and test_*.py files and runs them via pytest.
     Use --job/-j to run only specific GitLab CI jobs.
+    Use --file/-f to point at a CI config file other than .gitlab-ci.yml.
     """
     import pytest as _pytest
 
     # Pass job filter to pytest plugin via environment variable
     if jobs:
         os.environ["CATALYST_CI_TEST_JOBS"] = ",".join(jobs)
+
+    # Pass custom CI file to pytest plugin via environment variable
+    if ci_file:
+        os.environ["CATALYST_CI_TEST_FILE"] = ci_file
 
     args = [path]
     if verbose:

@@ -64,6 +64,14 @@ class TestBuildCommand:
         assert "--file" in cmd
         assert "custom.yml" in cmd
 
+    def test_list_json_with_file(self):
+        """--list-json must include --file so job metadata matches the pipeline."""
+        options = RunOptions(file="custom.yml")
+        cmd = _build_command(options, list_json=True)
+        assert "--list-json" in cmd
+        assert "--file" in cmd
+        assert "custom.yml" in cmd
+
     def test_with_extra_args(self):
         options = RunOptions(extra_args=["--mount", "/tmp:/data"])
         cmd = _build_command(options)
@@ -149,6 +157,43 @@ class TestRunPipeline:
         ):
             with pytest.raises(PipelineExecutionError, match="No .gitlab-ci.yml"):
                 run_pipeline(tmp_path)
+
+    def test_custom_file_skips_default_file_check(self, tmp_path):
+        """When options.file is set, missing .gitlab-ci.yml should not raise."""
+        (tmp_path / "custom-pipeline.yml").write_text(
+            "test:\n  script: echo hi\n"
+        )
+
+        mock_list_result = MagicMock()
+        mock_list_result.returncode = 0
+        mock_list_result.stdout = (
+            '[{"name": "test", "stage": "test", "when": "on_success"}]'
+        )
+        mock_list_result.stderr = ""
+
+        mock_run_result = MagicMock()
+        mock_run_result.returncode = 0
+        mock_run_result.stdout = ""
+        mock_run_result.stderr = "PASS  test\n"
+
+        with patch(
+            "catalyst_ci_test.runner.shutil.which",
+            return_value="/usr/bin/gitlab-ci-local",
+        ):
+            with patch(
+                "catalyst_ci_test.runner.subprocess.run",
+                side_effect=[mock_list_result, mock_run_result],
+            ) as mock_run:
+                options = RunOptions(file="custom-pipeline.yml")
+                result = run_pipeline(tmp_path, options)
+
+                # Both calls should pass --file custom-pipeline.yml
+                for call in mock_run.call_args_list:
+                    cmd = call.args[0]
+                    assert "--file" in cmd
+                    assert "custom-pipeline.yml" in cmd
+
+                assert result.success
 
     def test_subprocess_called_with_project_as_cwd(self, tmp_path):
         """Verify subprocess is executed FROM the project directory."""

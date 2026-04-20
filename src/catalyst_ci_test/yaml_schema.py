@@ -92,6 +92,7 @@ class YamlTestCase(BaseModel):
     templates: list[str] | None = None
     force_shell_executor: bool = False
     jobs: list[str] | None = None
+    file: str | None = None
     timeout: int = 600
     asserts: list[dict[str, Any]]
 
